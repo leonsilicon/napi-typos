@@ -9,16 +9,20 @@ if (platforms.length !== napi.targets.length || platforms.some(([, pin]) => pin 
 }
 
 async function verifyPackage(packageName) {
-  const url = new URL(`${encodeURIComponent(packageName)}/${encodeURIComponent(version)}`, 'https://registry.npmjs.org/')
+  const url = new URL(packageName.replace('/', '%2f'), 'https://registry.npmjs.org/')
   // npm scans new versions before making them installable.
   const deadline = Date.now() + 20 * 60_000
   while (Date.now() < deadline) {
-    const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(10_000) }).catch(() => undefined)
-    if (response?.ok) {
+    const response = await fetch(url, {
+      cache: 'no-store',
+      headers: { accept: 'application/vnd.npm.install-v1+json' },
+      signal: AbortSignal.timeout(10_000),
+    }).catch(() => undefined)
+    if (response?.ok && (await response.json()).versions?.[version]) {
       return
     }
     const status = response?.status
-    if (status !== undefined && status !== 404 && status !== 429 && status < 500) {
+    if (status !== undefined && !response.ok && status !== 404 && status !== 429 && status < 500) {
       throw new Error(`Registry reported HTTP ${status} for ${packageName}@${version}`)
     }
     await setTimeout(15_000)
