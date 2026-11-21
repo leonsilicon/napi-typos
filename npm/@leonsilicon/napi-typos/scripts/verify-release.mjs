@@ -10,17 +10,20 @@ if (platforms.length !== napi.targets.length || platforms.some(([, pin]) => pin 
 
 async function verifyPackage(packageName) {
   const url = new URL(`${encodeURIComponent(packageName)}/${encodeURIComponent(version)}`, 'https://registry.npmjs.org/')
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    const response = await fetch(url, { signal: AbortSignal.timeout(10_000) })
-    if (response.ok) {
+  // npm scans new versions before making them installable.
+  const deadline = Date.now() + 20 * 60_000
+  while (Date.now() < deadline) {
+    const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(10_000) }).catch(() => undefined)
+    if (response?.ok) {
       return
     }
-    if (response.status !== 404) {
-      throw new Error(`Registry reported HTTP ${response.status} for ${packageName}@${version}`)
+    const status = response?.status
+    if (status !== undefined && status !== 404 && status !== 429 && status < 500) {
+      throw new Error(`Registry reported HTTP ${status} for ${packageName}@${version}`)
     }
-    await setTimeout(5_000)
+    await setTimeout(15_000)
   }
-  throw new Error(`Missing ${packageName}@${version} on npm`)
+  throw new Error(`${packageName}@${version} was not available on npm after 20 minutes`)
 }
 
 await Promise.all([name, ...platforms.map(([packageName]) => packageName)].map(verifyPackage))
