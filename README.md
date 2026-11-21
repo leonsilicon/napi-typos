@@ -19,6 +19,6 @@ the npm package version runs NAPI-RS publishing for the platform packages and th
 main package. The workflow checks that all nine versions resolve on npm.
 
 For the first release, set the repository's `NPM_TOKEN` Actions secret to a granular npm
-publishing token with write access to the `@leonsilicon` scope. Subsequent releases can
-use npm trusted publishing by configuring `leonsilicon/napi-typos` and `publish.yml` for
-the main package and all eight platform packages.
+token with write access to the `@leonsilicon` scope and **Bypass 2FA** enabled. Subsequent
+releases can use npm trusted publishing by configuring `leonsilicon/napi-typos` and
+`publish.yml` for the main package and all eight platform packages.

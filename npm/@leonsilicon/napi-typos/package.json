@@ -8,16 +8,17 @@
     "url": "git+https://github.com/leonsilicon/napi-typos.git",
     "directory": "npm/@leonsilicon/napi-typos"
   },
-  "main": "index.js",
+  "type": "commonjs",
+  "main": "index.cjs",
   "types": "index.d.ts",
   "exports": {
     ".": {
       "types": "./index.d.ts",
       "import": "./index.mjs",
-      "require": "./index.js"
+      "require": "./index.cjs"
     }
   },
-  "files": ["index.js", "index.mjs", "index.d.ts", "LICENSE-APACHE", "LICENSE-MIT", "README.md"],
+  "files": ["index.cjs", "index.mjs", "index.d.ts", "LICENSE-APACHE", "LICENSE-MIT", "README.md"],
   "engines": { "node": ">=22" },
   "napi": {
     "binaryName": "napi-typos",
@@ -37,7 +38,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "scripts": {
-    "build": "napi build --platform --release",
+    "build": "napi build --platform --release --js index.cjs",
     "test": "node --test",
     "test:bun": "bun scripts/check-bun.mjs",
     "prepublishOnly": "napi prepublish -t npm --no-gh-release --root-publisher npm"

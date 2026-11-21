@@ -92,7 +92,7 @@ jobs:
           name: bindings-${{ matrix.target }}
           path: |
             npm/@leonsilicon/napi-typos/napi-typos.*.node
-            npm/@leonsilicon/napi-typos/index.js
+            npm/@leonsilicon/napi-typos/index.cjs
             npm/@leonsilicon/napi-typos/index.d.ts
           if-no-files-found: error
 
@@ -127,7 +127,7 @@ jobs:
         run: |
           bun run napi create-npm-dirs
           bun run napi artifacts --output-dir artifacts
-          cp artifacts/bindings-aarch64-apple-darwin/{index.js,index.d.ts} .
+          cp artifacts/bindings-aarch64-apple-darwin/{index.cjs,index.d.ts} .
           for package_dir in npm/*/; do
             cp LICENSE-APACHE LICENSE-MIT "$package_dir"
           done
