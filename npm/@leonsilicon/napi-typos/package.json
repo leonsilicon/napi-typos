@@ -10,7 +10,14 @@
   },
   "main": "index.js",
   "types": "index.d.ts",
-  "files": ["index.js", "index.d.ts", "LICENSE-APACHE", "LICENSE-MIT", "README.md"],
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.mjs",
+      "require": "./index.js"
+    }
+  },
+  "files": ["index.js", "index.mjs", "index.d.ts", "LICENSE-APACHE", "LICENSE-MIT", "README.md"],
   "engines": { "node": ">=22" },
   "napi": {
     "binaryName": "napi-typos",
@@ -32,7 +39,8 @@
   "scripts": {
     "build": "napi build --platform --release",
     "test": "node --test",
-    "prepublishOnly": "napi prepublish -t npm"
+    "test:bun": "bun scripts/check-bun.mjs",
+    "prepublishOnly": "napi prepublish -t npm --no-gh-release --root-publisher npm"
   },
   "devDependencies": {
     "@napi-rs/cli": "3.10.12"

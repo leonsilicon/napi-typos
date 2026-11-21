@@ -81,6 +81,9 @@ jobs:
       - name: Test addon on Node
         if: "!contains(matrix.target, 'musl')"
         run: bun run test
+      - name: Test the Bun module entry
+        if: "!contains(matrix.target, 'musl')"
+        run: bun run test:bun
       - name: Test addon on Alpine
         if: contains(matrix.target, 'musl')
         run: docker run --rm --volume "${PWD}:/addon:ro" --workdir /addon node:24-alpine node --test

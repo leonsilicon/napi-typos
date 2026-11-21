@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict')
 const { test } = require('node:test')
-const { checkText } = require('../index.js')
+const { checkText } = require('@leonsilicon/napi-typos')
 
 test('reports typos, suggestions and line-relative UTF-8 offsets', () => {
   assert.deepEqual(checkText('Good spelling.\n盾 🙂 teh shield.'), [
@@ -27,4 +27,9 @@ teh = "teh"
 test('rejects malformed configuration and accepts empty input', () => {
   assert.throws(() => checkText('teh', '[default'))
   assert.deepEqual(checkText(''), [])
+})
+
+test('exposes the same check through an ES module import', async () => {
+  const { checkText: checkTextFromEsm } = await import('@leonsilicon/napi-typos')
+  assert.strictEqual(checkTextFromEsm, checkText)
 })
