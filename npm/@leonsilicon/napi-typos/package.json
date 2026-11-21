@@ -1,0 +1,40 @@
+{
+  "name": "@leonsilicon/napi-typos",
+  "version": "1.52.2",
+  "description": "Node-API bindings for crate-ci/typos spellchecking",
+  "license": "MIT OR Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/leonsilicon/napi-typos.git",
+    "directory": "npm/@leonsilicon/napi-typos"
+  },
+  "main": "index.js",
+  "types": "index.d.ts",
+  "files": ["index.js", "index.d.ts", "LICENSE-APACHE", "LICENSE-MIT", "README.md"],
+  "engines": { "node": ">=22" },
+  "napi": {
+    "binaryName": "napi-typos",
+    "targets": [
+      "aarch64-apple-darwin",
+      "x86_64-apple-darwin",
+      "aarch64-unknown-linux-gnu",
+      "x86_64-unknown-linux-gnu",
+      "aarch64-unknown-linux-musl",
+      "x86_64-unknown-linux-musl",
+      "aarch64-pc-windows-msvc",
+      "x86_64-pc-windows-msvc"
+    ]
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "build": "napi build --platform --release",
+    "test": "node --test",
+    "prepublishOnly": "napi prepublish -t npm"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "3.10.12"
+  }
+}

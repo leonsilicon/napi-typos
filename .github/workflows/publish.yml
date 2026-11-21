@@ -1,0 +1,137 @@
+name: Build and publish
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+defaults:
+  run:
+    working-directory: npm/@leonsilicon/napi-typos
+
+jobs:
+  build:
+    name: Build and test ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            runner: macos-15
+          - target: x86_64-apple-darwin
+            runner: macos-15-intel
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-24.04-arm
+            build-flag: --use-napi-cross
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-24.04
+            build-flag: --use-napi-cross
+          - target: aarch64-unknown-linux-musl
+            runner: ubuntu-24.04-arm
+            build-flag: --cross-compile
+          - target: x86_64-unknown-linux-musl
+            runner: ubuntu-24.04
+            build-flag: --cross-compile
+          - target: aarch64-pc-windows-msvc
+            runner: windows-11-arm
+          - target: x86_64-pc-windows-msvc
+            runner: windows-2025
+
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          architecture: ${{ startsWith(matrix.target, 'aarch64-') && 'arm64' || 'x64' }}
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.99.1'
+          targets: ${{ matrix.target }}
+      - uses: mlugg/setup-zig@v2
+        if: contains(matrix.target, 'musl')
+        with:
+          version: '0.15.2'
+      - uses: taiki-e/install-action@v2
+        if: contains(matrix.target, 'musl')
+        with:
+          tool: cargo-zigbuild
+      - name: Install build dependencies
+        run: bun ci
+        working-directory: .
+      - run: cargo fetch --locked --target ${{ matrix.target }}
+      - name: Build addon
+        run: bun run build --target ${{ matrix.target }} ${{ matrix.build-flag }}
+        env:
+          CARGO_NET_OFFLINE: 'true'
+      - run: git diff --exit-code -- Cargo.lock
+      - name: Test addon on Node
+        if: "!contains(matrix.target, 'musl')"
+        run: bun run test
+      - name: Test addon on Alpine
+        if: contains(matrix.target, 'musl')
+        run: docker run --rm --volume "${PWD}:/addon:ro" --workdir /addon node:24-alpine node --test
+      - uses: actions/upload-artifact@v7
+        with:
+          name: bindings-${{ matrix.target }}
+          path: |
+            npm/@leonsilicon/napi-typos/napi-typos.*.node
+            npm/@leonsilicon/napi-typos/index.js
+            npm/@leonsilicon/napi-typos/index.d.ts
+          if-no-files-found: error
+
+  publish:
+    name: Publish to npm
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - run: bun ci
+        working-directory: .
+      - name: Check the release tag
+        run: |
+          node -e 'if (process.env.GITHUB_REF_NAME !== "v" + require("./package.json").version) throw Error("Tag must match package.json version")'
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: bindings-*
+          path: npm/@leonsilicon/napi-typos/artifacts
+      - name: Assemble all platform packages
+        run: |
+          bun run napi create-npm-dirs
+          bun run napi artifacts --output-dir artifacts
+          cp artifacts/bindings-aarch64-apple-darwin/{index.js,index.d.ts} .
+          for package_dir in npm/*/; do
+            cp LICENSE-APACHE LICENSE-MIT "$package_dir"
+          done
+      - name: Publish platform packages and the root package
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'
+      - name: Verify every package version on npm
+        run: node scripts/verify-release.mjs

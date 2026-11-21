@@ -1,0 +1,22 @@
+[package]
+name = "napi-typos"
+version = "1.52.2"
+edition = "2024"
+rust-version = "1.95"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+napi = { version = "3.16.2", default-features = false, features = ["napi8"] }
+napi-derive = "3.7.1"
+typos = "=0.10.44"
+typos-cli = "=1.52.2"
+
+[build-dependencies]
+napi-build = "2.6.0"
+
+[profile.release]
+strip = "symbols"
