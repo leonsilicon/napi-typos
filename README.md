@@ -14,11 +14,14 @@ bun run test
 
 ## Releases
 
-GitHub Actions builds and tests all eight targets. A pushed `v<version>` tag matching
-the npm package version runs NAPI-RS publishing for the platform packages and then the
-main package. The workflow checks that all nine versions resolve on npm.
+GitHub Actions builds and tests all eight targets. Push a `v<version>` tag matching
+the version in the package manifest to publish the platform packages and the main
+package to npm. After all nine tarballs are installable, the workflow verifies their
+registry checksums and publishes them to the matching GitHub release with `SHA256SUMS`.
+Rerun a failed release job to resume after any packages already published to npm.
+Package versions can advance independently of the bundled upstream spellchecker.
 
-For the first release, set the repository's `NPM_TOKEN` Actions secret to a granular npm
-token with write access to the `@leonsilicon` scope and **Bypass 2FA** enabled. Subsequent
-releases can use npm trusted publishing by configuring `leonsilicon/napi-typos` and
-`publish.yml` for the main package and all eight platform packages.
+The workflow uses the repository's `NPM_TOKEN` Actions secret. Use a granular npm
+token with write access to the `@leonsilicon` scope and **Bypass 2FA** enabled.
+To use npm trusted publishing, configure `leonsilicon/napi-typos` and `publish.yml`
+for the main package and all eight platform packages.

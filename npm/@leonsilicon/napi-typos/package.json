@@ -1,6 +1,6 @@
 {
   "name": "@leonsilicon/napi-typos",
-  "version": "1.52.2",
+  "version": "1.52.3",
   "description": "Node-API bindings for crate-ci/typos spellchecking",
   "license": "MIT OR Apache-2.0",
   "repository": {
@@ -40,8 +40,7 @@
   "scripts": {
     "build": "napi build --platform --release --js index.cjs",
     "test": "node --test",
-    "test:bun": "bun scripts/check-bun.mjs",
-    "prepublishOnly": "napi prepublish -t npm --no-gh-release --root-publisher npm"
+    "test:bun": "bun scripts/check-bun.mjs"
   },
   "devDependencies": {
     "@napi-rs/cli": "3.10.12"

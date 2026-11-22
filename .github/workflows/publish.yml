@@ -97,13 +97,13 @@ jobs:
           if-no-files-found: error
 
   publish:
-    name: Publish to npm
+    name: Publish to npm and GitHub Releases
     if: startsWith(github.ref, 'refs/tags/v')
     needs: build
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 40
     permissions:
-      contents: read
+      contents: write
       id-token: write
     steps:
       - uses: actions/checkout@v7
@@ -130,11 +130,40 @@ jobs:
           cp artifacts/bindings-aarch64-apple-darwin/{index.cjs,index.d.ts} .
           for package_dir in npm/*/; do
             cp LICENSE-APACHE LICENSE-MIT "$package_dir"
+            jq '.files += ["LICENSE-APACHE", "LICENSE-MIT"]' "$package_dir/package.json" > "$package_dir/package.json.tmp"
+            mv "$package_dir/package.json.tmp" "$package_dir/package.json"
           done
-      - name: Publish platform packages and the root package
-        run: npm publish --access public
+          bun run napi prepublish -t npm --no-gh-release --skip-optional-publish --root-publisher npm
+      - name: Publish packages and verify installable tarballs
+        run: node scripts/publish-npm.mjs "$RUNNER_TEMP/napi-typos-release"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: 'true'
-      - name: Verify every package version on npm
-        run: node scripts/verify-release.mjs
+      - name: Publish verified tarballs to GitHub Releases
+        working-directory: ${{ runner.temp }}/napi-typos-release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="$GITHUB_REF_NAME"
+          if ! draft=$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft); then
+            flags=()
+            if [[ "$tag" == *-* ]]; then flags+=(--prerelease); fi
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --verify-tag --draft \
+              --title "$tag" --generate-notes "${flags[@]}"
+            draft=true
+          fi
+          if [[ "$draft" == true ]]; then
+            gh release upload "$tag" --repo "$GITHUB_REPOSITORY" --clobber \
+              ./*.tgz LICENSE-APACHE LICENSE-MIT SHA256SUMS
+          fi
+          release_id=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" |
+            jq -er --arg tag "$tag" '.[] | select(.tag_name == $tag) | .id')
+          gh api "repos/$GITHUB_REPOSITORY/releases/$release_id/assets" --paginate > uploaded-assets.json
+          jq -er '.[] | select(.state == "uploaded") | "\(.digest | sub("^sha256:"; ""))  \(.name)"' \
+            uploaded-assets.json | sort > uploaded-checksums.txt
+          { cat SHA256SUMS; sha256sum SHA256SUMS; } | sort > expected-checksums.txt
+          diff -u expected-checksums.txt uploaded-checksums.txt
+          if [[ "$draft" == true ]]; then
+            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false
+          fi
