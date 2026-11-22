@@ -38,15 +38,36 @@ async function lookupPackageVersion(packageName, waiting = false) {
   throw new Error(`Registry reported HTTP ${response.status} for ${packageName}@${version}`)
 }
 
-async function waitForPublishedPackage(packageName) {
-  // New versions can be accepted by npm before they appear in its install metadata.
+async function downloadVerifiedTarball(packageName, filename) {
+  // The registry can list a new version before its tarball is downloadable.
   const deadline = Date.now() + 20 * 60_000
+  let dist
   while (Date.now() < deadline) {
-    const published = await lookupPackageVersion(packageName, true)
-    if (published) return published
+    dist ??= (await lookupPackageVersion(packageName, true))?.dist
+    if (dist) {
+      const url = new URL(dist.tarball)
+      if (url.origin !== registry || !url.pathname.endsWith(`/-/${filename}`)) {
+        throw new Error(`Unexpected npm tarball URL for ${packageName}@${version}`)
+      }
+      const response = await fetch(url, {
+        cache: 'no-store',
+        signal: AbortSignal.timeout(60_000),
+      }).catch(() => undefined)
+      if (response?.ok) {
+        const body = await response.arrayBuffer().catch(() => undefined)
+        if (body) {
+          const bytes = Buffer.from(body)
+          const integrity = `sha512-${createHash('sha512').update(bytes).digest('base64')}`
+          if (integrity !== dist.integrity) throw new Error(`Integrity mismatch for ${filename}`)
+          return bytes
+        }
+      } else if (response && response.status !== 404 && response.status !== 429 && response.status < 500) {
+        throw new Error(`Could not download ${filename} (HTTP ${response.status})`)
+      }
+    }
     await setTimeout(15_000)
   }
-  throw new Error(`${packageName}@${version} was not available on npm after 20 minutes`)
+  throw new Error(`${filename} was not available to download from npm after 20 minutes`)
 }
 
 const published = await Promise.all(packages.map(({ name }) => lookupPackageVersion(name)))
@@ -56,25 +77,17 @@ for (const [index, { name, directory }] of packages.entries()) {
     console.log(`${name}@${version} is already on npm`)
     continue
   }
-  execFileSync('npm', ['publish', resolve(directory), '--workspaces=false', '--ignore-scripts', '--access', 'public', '--tag', distTag], {
-    stdio: 'inherit',
-    timeout: 120_000,
-  })
+  execFileSync(
+    'npm',
+    ['publish', resolve(directory), '--workspaces=false', '--ignore-scripts', '--access', 'public', '--tag', distTag],
+    { stdio: 'inherit', timeout: 120_000 },
+  )
 }
 
 await mkdir(output, { recursive: true })
 const checksums = await Promise.all(packages.map(async ({ name }) => {
-  const { dist } = await waitForPublishedPackage(name)
   const filename = `${name.split('/').at(-1)}-${version}.tgz`
-  const url = new URL(dist.tarball)
-  if (url.origin !== registry || !url.pathname.endsWith(`/-/${filename}`)) {
-    throw new Error(`Unexpected npm tarball URL for ${name}@${version}`)
-  }
-  const response = await fetch(url, { signal: AbortSignal.timeout(60_000) })
-  if (!response.ok) throw new Error(`Could not download ${filename} (HTTP ${response.status})`)
-  const bytes = Buffer.from(await response.arrayBuffer())
-  const integrity = `sha512-${createHash('sha512').update(bytes).digest('base64')}`
-  if (integrity !== dist.integrity) throw new Error(`Integrity mismatch for ${filename}`)
+  const bytes = await downloadVerifiedTarball(name, filename)
   await writeFile(join(output, filename), bytes)
   console.log(`Verified npm tarball ${filename}`)
   return `${createHash('sha256').update(bytes).digest('hex')}  ${filename}`

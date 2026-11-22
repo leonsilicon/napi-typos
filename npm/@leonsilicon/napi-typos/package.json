@@ -1,6 +1,6 @@
 {
   "name": "@leonsilicon/napi-typos",
-  "version": "1.52.3",
+  "version": "1.52.4",
   "description": "Node-API bindings for crate-ci/typos spellchecking",
   "license": "MIT OR Apache-2.0",
   "repository": {

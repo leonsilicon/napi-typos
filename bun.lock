@@ -7,7 +7,7 @@
     },
     "npm/@leonsilicon/napi-typos": {
       "name": "@leonsilicon/napi-typos",
-      "version": "1.52.3",
+      "version": "1.52.4",
       "devDependencies": {
         "@napi-rs/cli": "3.10.12",
       },

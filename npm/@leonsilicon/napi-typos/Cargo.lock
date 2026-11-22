@@ -829,7 +829,7 @@ dependencies = [
 
 [[package]]
 name = "napi-typos"
-version = "1.52.3"
+version = "1.52.4"
 dependencies = [
  "napi",
  "napi-build",
